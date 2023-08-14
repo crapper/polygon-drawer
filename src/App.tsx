@@ -196,6 +196,17 @@ export const AnchorElement = observer(function (props: { anchorVec: Vector, rect
     radius={5}
     fill="red"
     draggable
+    onDragMove={action((e) => {
+      const newAnchorPos = fromCanvasToCartesian(new Vector(e.target.x(), e.target.y())); //Cartesian
+      const newRectSpec = transformRectSpec(rectObject, anchorVec, newAnchorPos); //Cartesian
+      rectObject.x = newRectSpec.x;
+      rectObject.y = newRectSpec.y;
+      rectObject.width = newRectSpec.width;
+      rectObject.height = newRectSpec.height;
+      const constAnchorPos = fromCartesianToCanvas(getAnchorPos(rectObject, anchorVec)); //Canvas
+      e.target.x(constAnchorPos.x);
+      e.target.y(constAnchorPos.y);
+    })}
   />
 });
 
@@ -217,15 +228,17 @@ const App = observer(function () {
   const controller = useState(() => new AppController())[0];
 
   return (
-    <Stage width={window.innerWidth} height={window.innerHeight}>
-      <Layer>
-        <Text text="Try to drag a star" />
-        {controller.rectObjects.map((star) => (
-          <RectElement key={star.id} rectObject={star} appController={controller} />
-        ))}
-        {controller.selectedRectObject && <AnchorsElement rectObject={controller.selectedRectObject} appController={controller} />}
-      </Layer>
-    </Stage>
+    <div>
+      <button onClick={action((e) => {controller.selected = null})}>Reset</button>
+      <Stage width={window.innerWidth} height={window.innerHeight}>
+        <Layer >
+          {controller.rectObjects.map((star) => (
+            <RectElement key={star.id} rectObject={star} appController={controller} />
+          ))}
+          {controller.selectedRectObject && <AnchorsElement rectObject={controller.selectedRectObject} appController={controller} />}
+        </Layer>
+      </Stage>
+    </div>
   );
 });
 
