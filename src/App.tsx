@@ -3,6 +3,9 @@ import { KonvaEventObject } from 'konva/lib/Node';
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Stage, Layer, Star, Text, Rect, Circle } from 'react-konva';
+import { action, computed, makeAutoObservable, makeObservable, observable } from "mobx";
+import { observer } from "mobx-react";
+import { JsxElement } from 'typescript';
 
 export class Vector {
   constructor(public x: number, public y: number) { }
@@ -38,14 +41,13 @@ export class Vector {
 }
 
 export interface RectSpec {
-  x: number; // center X
-  y: number; // center Y
+  x: number; // center X, Cartesian
+  y: number; // center Y, Cartesian
   width: number;
   height: number;
 }
 
-export interface RectObject {
-  rect: RectSpec;
+export interface RectObject extends RectSpec {
   id: string;
   rotation?: number;
   isDragging?: boolean;
@@ -70,16 +72,16 @@ export const BOTTOM_LEFT: Readonly<Vector> = new Vector(-1, -1);
 export const LEFT: Readonly<Vector> = new Vector(-1, 0);
 export const ALL_ANCHORS: Readonly<Vector>[] = [TOP_LEFT, TOP, TOP_RIGHT, RIGHT, BOTTOM_RIGHT, BOTTOM, BOTTOM_LEFT, LEFT];
 
-export enum Anchor {
-  TOP_LEFT,
-  TOP,
-  TOP_RIGHT,
-  RIGHT,
-  BOTTOM_RIGHT,
-  BOTTOM,
-  BOTTOM_LEFT,
-  LEFT
-}
+// export enum AnchorEnum {
+//   TOP_LEFT,
+//   TOP,
+//   TOP_RIGHT,
+//   RIGHT,
+//   BOTTOM_RIGHT,
+//   BOTTOM,
+//   BOTTOM_LEFT,
+//   LEFT
+// }
 
 export function getAnchorPos(rect: RectSpec, anchorVec: Vector): Vector { //get specific anchor position
   return new Vector(rect.x, rect.y).add(anchorVec.multiply(new Vector(rect.width / 2, rect.height / 2)));
@@ -122,72 +124,109 @@ function makeID(length: number) {
   return result;
 }
 
+function fromCartesianToCanvas(vecInCartesian: Vector): Vector {
+  return vecInCartesian.multiply(new Vector(1, -1)).add(new Vector(window.innerWidth / 2, window.innerHeight / 2)); //x is same direction
+}
+
+function fromCanvasToCartesian(vecInCanvas: Vector): Vector {
+  return vecInCanvas.subtract(new Vector(window.innerWidth / 2, window.innerHeight / 2)).multiply(new Vector(1, -1))
+}
+
 function generateShapes(): RectObject[] {
-  let rectspec: RectSpec
-  let x = Math.random() * window.innerWidth;
-  let y = Math.random() * window.innerHeight;
-  rectspec = createRectSpec(x, y, x + 50, y + 50)
-  return [{ rect: rectspec, id: makeID(10), rotation: 0, isDragging: true }];
+  // const x = Math.random() * window.innerWidth;
+  // const y = Math.random() * window.innerHeight;
+  const x = 0;
+  const y = 0;
+  return [{ x, y, width: 50, height: 50, id: makeID(10), rotation: 0, isDragging: true }];
 }
 
 const INITIAL_STATE = generateShapes();
 
 
-export function RectElement(props: { rectObject: RectObject, setSelected: React.Dispatch<React.SetStateAction<string | null>> }) {
-  const { rectObject, setSelected } = props;
+export const RectElement = observer(function (props: { rectObject: RectObject, appController: AppController }) {
+  const { rectObject, appController } = props;
+
+  const posInCanvas = fromCartesianToCanvas(new Vector(rectObject.x, rectObject.y));
 
   const handleDragMove = (e: KonvaEventObject<DragEvent>) => {
-    const width = rectObject.rect.width;
-    const height = rectObject.rect.height;
-    rectObject.rect = {
-      x: e.target.x() - width / 2,
-      y: e.target.y() - height / 2,
-      width: width,
-      height: height,
-    }
+    //e.target.x Canvas
+    let vec = new Vector(e.target.x(), e.target.y()).add(new Vector(rectObject.width / 2, rectObject.height / 2)); // Canvas, make it become center again for the rectObject by add half of height and width
+    vec = fromCanvasToCartesian(vec)
+    rectObject.x = vec.x;
+    rectObject.y = vec.y;
   }
 
   return <Rect
     id={rectObject.id}
-    x={rectObject.rect.x + rectObject.rect.width / 2}
-    y={rectObject.rect.y + rectObject.rect.height / 2}
-    width={rectObject.rect.width}
-    height={rectObject.rect.height}
-    numPoints={6}
-    innerRadius={20}
-    outerRadius={40}
+    x={posInCanvas.x - rectObject.width / 2} // Canvas
+    y={posInCanvas.y - rectObject.height / 2} // Canvas
+    width={rectObject.width}
+    height={rectObject.height}
     fill="#89b717"
     opacity={0.8}
     draggable
     rotation={rectObject.rotation}
-    scaleX={rectObject.isDragging ? 1.2 : 1}
-    scaleY={rectObject.isDragging ? 1.2 : 1}
-    onClick={(e) => { setSelected(rectObject.id) }}
-    onDragMove={(e) => { handleDragMove(e) }}
+    onClick={action((e) => { appController.selected = rectObject.id })}
+    onDragMove={action(handleDragMove)}
   />
-}
+});
 
-
-export default function App() {
-  const [rectObjects, setlst] = React.useState<RectObject[]>(INITIAL_STATE);
-  // const [points, setPoints] = React.useState<CircleObject[]>([]);
-  // const [onCircle, setOnCircle] = React.useState(true);
-  const [selected, setSelected] = React.useState<string | null>(null);
-
-  function findRectObject(id: string) {
-    return rectObjects.find((r) => r.id === id);
+class AppController {
+  rectObjects: RectObject[] = INITIAL_STATE;
+  selected: string | null = null;
+  constructor() {
+    makeAutoObservable(this);
   }
 
+  get selectedRectObject(): RectObject | undefined {
+    return this.rectObjects.find((rectObject) => rectObject.id === this.selected);
+  }
+
+  findRectObjectById(id: string): RectObject | undefined {
+    return this.rectObjects.find((rectObject) => rectObject.id === id);
+  }
+}
+
+export const AnchorElement = observer(function (props: { anchorVec: Vector, rectObject: RectObject, appController: AppController }) {
+  const { anchorVec, rectObject, appController } = props;
+  const anchorPos = fromCartesianToCanvas(getAnchorPos(rectObject, anchorVec)); // Canvas
+  return <Circle
+    x={anchorPos.x} //canvas
+    y={anchorPos.y}
+    radius={5}
+    fill="red"
+    draggable
+  />
+});
+
+export const AnchorsElement = observer(function (props: { rectObject: RectObject, appController: AppController }) {
+  const { rectObject, appController } = props;
+
+  return <>
+    {
+      ALL_ANCHORS.map((anchorVec: Vector, idx) => {
+        return <AnchorElement key={idx} anchorVec={anchorVec} rectObject={rectObject} appController={appController} />
+      })
+    }
+    {/* <AnchorElement anchorVec={new Vector(0, 0)} rectObject={rectObject} appController={appController}/> */}
+  </>
+});
+
+
+const App = observer(function () {
+  const controller = useState(() => new AppController())[0];
 
   return (
     <Stage width={window.innerWidth} height={window.innerHeight}>
       <Layer>
         <Text text="Try to drag a star" />
-        {rectObjects.map((star) => (
-          <RectElement key={star.id} rectObject={star} setSelected={setSelected} />
+        {controller.rectObjects.map((star) => (
+          <RectElement key={star.id} rectObject={star} appController={controller} />
         ))}
-
+        {controller.selectedRectObject && <AnchorsElement rectObject={controller.selectedRectObject} appController={controller} />}
       </Layer>
     </Stage>
   );
-};
+});
+
+export default App;
