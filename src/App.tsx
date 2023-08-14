@@ -31,7 +31,7 @@ function generateShapes(): RectObject[] {
   // const y = Math.random() * window.innerHeight;
   const x = 0;
   const y = 0;
-  return [{ x, y, width: 50, height: 50, id: makeID(10), rotation: 0, isDragging: false }];
+  return [{ x, y, width: 50, height: 50, id: makeID(10), rotation: 45, isDragging: false }];
 }
 
 const INITIAL_STATE = generateShapes();
@@ -44,7 +44,7 @@ export const RectElement = observer(function (props: { rectObject: RectObject, a
 
   const handleDragMove = (e: KonvaEventObject<DragEvent>) => {
     //e.target.x Canvas
-    let vec = new Vector(e.target.x(), e.target.y()).add(new Vector(rectObject.width / 2, rectObject.height / 2)); // Canvas, make it become center again for the rectObject by add half of height and width
+    let vec = new Vector(e.target.x(), e.target.y());//.add(new Vector(rectObject.width / 2, rectObject.height / 2)); // Canvas, make it become center again for the rectObject by add half of height and width
     vec = fromCanvasToCartesian(vec)
     rectObject.x = vec.x;
     rectObject.y = vec.y;
@@ -52,8 +52,8 @@ export const RectElement = observer(function (props: { rectObject: RectObject, a
 
   return <Rect
     id={rectObject.id}
-    x={posInCanvas.x - rectObject.width / 2} // Canvas
-    y={posInCanvas.y - rectObject.height / 2} // Canvas
+    x={posInCanvas.x} // Canvas
+    y={posInCanvas.y} // Canvas
     width={rectObject.width}
     height={rectObject.height}
     fill="#89b717"
@@ -62,6 +62,8 @@ export const RectElement = observer(function (props: { rectObject: RectObject, a
     rotation={rectObject.rotation}
     onClick={action((e) => { appController.selected = rectObject.id })}
     onDragMove={action(handleDragMove)}
+    offsetX={rectObject.width / 2}
+    offsetY={rectObject.height / 2}
   />
 });
 
