@@ -2,7 +2,7 @@
 // import { render, screen } from '@testing-library/react';
 // import App from './App';
 
-import { RectSpec, getAnchorPos, TOP_LEFT, Vector, BOTTOM_RIGHT, transformRectSpec, RIGHT, createRectSpec, LEFT, TOP, BOTTOM } from "./App";
+import { RectSpec, getAnchorPos, TOP_LEFT, Vector, BOTTOM_RIGHT, transformRectSpec, RIGHT, createRectSpec, LEFT, TOP, BOTTOM, getAnchorVec } from "./Calculation";
 
 // test('renders learn react link', () => {
 //   render(<App />);
@@ -22,6 +22,9 @@ test('transformRectSpec', () => {
 
   expect(getAnchorPos({ x: 0, y: 0, width: 10, height: 10 }, TOP_LEFT)).toEqual(new Vector(-5, 5));
   expect(getAnchorPos({ x: 0, y: 0, width: 10, height: 10 }, BOTTOM_RIGHT)).toEqual(new Vector(5, -5));
+
+  expect(getAnchorVec({ x: 0, y: 0, width: 10, height: 10 }, new Vector(-5, 5))).toEqual(TOP_LEFT);
+  expect(getAnchorVec({ x: 0, y: 0, width: 10, height: 10 }, new Vector(5, -5))).toEqual(BOTTOM_RIGHT);
 
   ans = transformRectSpec({ x: 0, y: 0, width: 10, height: 10 }, BOTTOM_RIGHT, new Vector(6, 6));
   expect(ans).toEqual({ x: 0.5, y: 5.5, width: 11, height: 1 });
