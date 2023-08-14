@@ -2,7 +2,7 @@ import { get } from 'http';
 import { KonvaEventObject } from 'konva/lib/Node';
 import React, { useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Stage, Layer, Star, Text, Rect, Circle } from 'react-konva';
+import { Stage, Layer, Star, Text, Rect, Circle, Group } from 'react-konva';
 import { action, computed, makeAutoObservable, makeObservable, observable } from "mobx";
 import { observer } from "mobx-react";
 import { JsxElement } from 'typescript';
@@ -87,14 +87,15 @@ export const AnchorElement = observer(function (props: { anchorVec: Vector, rect
   const { anchorVec: oldAnchorVec, rectObject, appController } = props;
   const oldAnchorPos = getAnchorPos(rectObject, oldAnchorVec); // Cartesian
   const oldAnchorPosInCanvas = fromCartesianToCanvas(oldAnchorPos); // Canvas
+  const rectObjectPosInCanvas = fromCartesianToCanvas(new Vector(rectObject.x, rectObject.y)); // Canvas
   return <Circle
-    x={oldAnchorPosInCanvas.x}
-    y={oldAnchorPosInCanvas.y}
+    x={oldAnchorPosInCanvas.x - rectObjectPosInCanvas.x}
+    y={oldAnchorPosInCanvas.y - rectObjectPosInCanvas.y}
     radius={5}
     fill="red"
     draggable
     onDragMove={action((e) => {
-      const newAnchorPosInCanvas = new Vector(e.target.x(), e.target.y()); // Canvas
+      const newAnchorPosInCanvas = new Vector(e.target.x(), e.target.y()).add(rectObjectPosInCanvas); // Canvas
       const newAnchorPos = fromCanvasToCartesian(newAnchorPosInCanvas); // Cartesian
       const alignedNewAnchorPos = getAlignedAnchorPos(newAnchorPos, oldAnchorPos, oldAnchorVec);
       const newAnchorVec = getAnchorVec(rectObject, alignedNewAnchorPos);
@@ -103,9 +104,9 @@ export const AnchorElement = observer(function (props: { anchorVec: Vector, rect
       rectObject.y = newRectSpec.y;
       rectObject.width = newRectSpec.width;
       rectObject.height = newRectSpec.height;
-      
+
       const feedbackAnchorPos = getAnchorPos(rectObject, oldAnchorVec); // Cartesian
-      const feedbackAnchorPosInCanvas = fromCartesianToCanvas(feedbackAnchorPos); // Canvas
+      const feedbackAnchorPosInCanvas = fromCartesianToCanvas(feedbackAnchorPos).subtract(rectObjectPosInCanvas); // Canvas
       e.target.x(feedbackAnchorPosInCanvas.x);
       e.target.y(feedbackAnchorPosInCanvas.y);
     })}
@@ -115,12 +116,17 @@ export const AnchorElement = observer(function (props: { anchorVec: Vector, rect
 export const AnchorsElement = observer(function (props: { rectObject: RectObject, appController: AppController }) {
   const { rectObject, appController } = props;
 
+  const rectObjectPosInCanvas = fromCartesianToCanvas(new Vector(rectObject.x, rectObject.y)); // Canvas
+
   return <>
-    {
-      ALL_ANCHORS.map((anchorVec: Vector, idx) => {
-        return <AnchorElement key={idx} anchorVec={anchorVec} rectObject={rectObject} appController={appController} />
-      })
-    }
+  {/* x-y */}
+    <Group rotation={rectObject.rotation} x={rectObjectPosInCanvas.x} y={rectObjectPosInCanvas.y}> 
+      {
+        ALL_ANCHORS.map((anchorVec: Vector, idx) => {
+          return <AnchorElement key={idx} anchorVec={anchorVec} rectObject={rectObject} appController={appController} />
+        })
+      }
+    </Group>
     {/* <AnchorElement anchorVec={new Vector(0, 0)} rectObject={rectObject} appController={appController}/> */}
   </>
 });
@@ -131,7 +137,7 @@ const App = observer(function () {
 
   return (
     <div>
-      <button onClick={action((e) => {controller.selected = null})}>Reset</button>
+      <button onClick={action((e) => { controller.selected = null })}>Reset</button>
       <Stage width={window.innerWidth} height={window.innerHeight}>
         <Layer >
           {controller.rectObjects.map((star) => (
